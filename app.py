@@ -32,8 +32,7 @@ def predict_ranking():
         sorted_teams = df_numeric.mean(axis=1).sort_values(ascending=False).index.tolist()
 
         return jsonify({
-            'ranking': sorted_teams,
-            'message': f"예상 순위: 1위 {sorted_teams[0]}, 2위 {sorted_teams[1]}, ..."
+            'ranking': sorted_teams
         })
 
     except Exception as e:
