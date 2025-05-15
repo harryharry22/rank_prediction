@@ -1,30 +1,41 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
+import crawler
+import data_processor
 import predictor
+import pandas as pd  # pandas 추가 임포트
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False 
+app.config['JSON_AS_ASCII'] = False
 
-# 전역 변수로 데이터 저장
 cached_data = {
-    'win_probability_df': None
+    'hitter_data': None,
+    'pitcher_data': None,
+    'win_probability_df': None,
+    'last_update': None
 }
 
 @app.route('/')
 def home():
-    """인자 없이 호출 시 예상 순위 리스트 반환"""
-    try:
-        if cached_data['win_probability_df'] is None:
-            win_probability_df = predictor.get_win_probability_df(cached_data)
-            cached_data['win_probability_df'] = win_probability_df
-        else:
-            win_probability_df = cached_data['win_probability_df']
+    return "KBO 야구 승률 예측 API. '/ranking_predict' 엔드포인트를 사용하세요."
 
-        df_processed = win_probability_df.replace('-', 0).astype(float)
-        df_processed['average_win_prob'] = df_processed.mean(axis=1)
-        sorted_df = df_processed.sort_values(by='average_win_prob', ascending=False)
+
+@app.route('/ranking_predict', methods=['GET'])
+def predict_ranking():
+    try:
+        win_probability_df = predictor.get_win_probability_df(cached_data)
         
-        return jsonify(sorted_df.index.tolist())
-    
+        if win_probability_df is None or win_probability_df.empty:
+            return jsonify({'error': '데이터가 아직 준비되지 않았습니다.'}), 503
+
+        # 숫자 변환 및 평균 승률 계산
+        df_numeric = win_probability_df.apply(pd.to_numeric, errors='coerce')
+        sorted_teams = df_numeric.mean(axis=1).sort_values(ascending=False).index.tolist()
+
+        return jsonify({
+            'ranking': sorted_teams,
+            'message': f"예상 순위: 1위 {sorted_teams[0]}, 2위 {sorted_teams[1]}, ..."
+        })
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
